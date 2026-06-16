@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from supabase_client import supabase
 import uuid
-
+import httpx
 app = FastAPI(title="Mizpah API")
 
 
@@ -75,30 +75,26 @@ async def enroll(
 
 @app.post("/scan")
 async def scan(image: str = Form(...), mode: str = Form(...)):
-    if mode == "active":
-        return {
-            "matched": True,
-            "confidence": 97.4,
-            "profile": {
-                "name": "Adewale O. Balogun",
-                "type": "medical",
-                "blood_type": "O+",
-                "allergies": ["Penicillin", "Latex"],
-                "conditions": ["Type-2 Diabetes"],
-                "emergency_contact": "+234 802 345 6789"
-            }
-        }
-    else:
-        return {
-            "matched": True,
-            "confidence": 94.0,
-            "profile": {
-                "name": "Test Missing Person",
-                "type": "missing",
-                "last_seen_location": "Main Gate"
-            }
-        }
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                "https://mizpah-ml-production.up.railway.app/scan",
+                json={"image": image, "mode": mode}
+            )
+            result = response.json()
 
+            # Log match event if matched
+            if result.get("matched"):
+                supabase.table("match_events").insert({
+                    "person_id": None,
+                    "confidence": result.get("confidence"),
+                    "use_case_type": mode,
+                    "location": "camera-feed",
+                }).execute()
+
+            return result
+    except Exception as e:
+        return {"error": str(e), "matched": False}
 
 @app.post("/demo/reset")
 def demo_reset():
@@ -140,3 +136,4 @@ async def confirm_alert(
         "alert": alert.data,
         "sms": sms_result
     }
+    
