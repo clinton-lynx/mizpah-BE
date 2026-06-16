@@ -105,3 +105,38 @@ def demo_reset():
     supabase.table("match_events").delete().neq("id", "").execute()
     supabase.table("alerts").delete().neq("id", "").execute()
     return {"status": "reset complete"}
+from termii import send_sms
+
+@app.post("/alert/confirm")
+async def confirm_alert(
+    match_event_id: str = Form(...),
+    person_name: str = Form(...),
+    emergency_contact: str = Form(...),
+    location: str = Form(...),
+    actioned_by: str = Form(...),
+):
+    # Save alert to database
+    alert = supabase.table("alerts").insert({
+        "match_event_id": match_event_id,
+        "channel": "SMS",
+        "recipient": emergency_contact,
+        "status": "sent",
+    }).execute()
+
+    # Send SMS via Termii
+    message = (
+        f"MIZPAH ALERT: {person_name} has been located at {location}. "
+        f"Please contact {actioned_by} immediately."
+    )
+    sms_result = await send_sms(emergency_contact, message)
+
+    # Log to audit
+    supabase.table("match_events").update({
+        "actioned_by": actioned_by
+    }).eq("id", match_event_id).execute()
+
+    return {
+        "success": True,
+        "alert": alert.data,
+        "sms": sms_result
+    }
