@@ -180,8 +180,4 @@ def get_cases():
         "missing_persons": missing.data,
         "medical_profiles": medical.data
     }
-        "success": True,
-        "alert": alert.data,
-        "sms": sms_result
-    }
     
