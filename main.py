@@ -111,29 +111,42 @@ async def confirm_alert(
     location: str = Form(...),
     actioned_by: str = Form(...),
 ):
-    # Save alert to database
-    alert = supabase.table("alerts").insert({
-        "match_event_id": match_event_id,
-        "channel": "SMS",
-        "recipient": emergency_contact,
-        "status": "sent",
-    }).execute()
+    try:
+        alert = supabase.table("alerts").insert({
+            "match_event_id": match_event_id,
+            "channel": "SMS",
+            "recipient": emergency_contact,
+            "status": "sent",
+        }).execute()
 
-    # Send SMS via Termii
-    message = (
-        f"MIZPAH ALERT: {person_name} has been located at {location}. "
-        f"Please contact {actioned_by} immediately."
-    )
-    sms_result = await send_sms(emergency_contact, message)
+        message = (
+            f"MIZPAH ALERT: {person_name} has been located at {location}. "
+            f"Please contact {actioned_by} immediately."
+        )
+        sms_result = await send_sms(emergency_contact, message)
 
-    # Log to audit
-    supabase.table("match_events").update({
-        "actioned_by": actioned_by
-    }).eq("id", match_event_id).execute()
+        return {
+            "success": True,
+            "alert": alert.data,
+            "sms": sms_result
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+@app.post("/demo/reset")
+def demo_reset():
+    supabase.table("match_events").delete().neq("id", "").execute()
+    supabase.table("alerts").delete().neq("id", "").execute()
+    return {"status": "reset complete"}
 
+
+# ADD THIS BELOW ↓
+@app.get("/cases")
+def get_cases():
+    watchlist = supabase.table("watchlist").select("*").execute()
+    missing = supabase.table("missing_persons").select("*").execute()
+    medical = supabase.table("medical_profiles").select("*").execute()
     return {
-        "success": True,
-        "alert": alert.data,
-        "sms": sms_result
+        "watchlist": watchlist.data,
+        "missing_persons": missing.data,
+        "medical_profiles": medical.data
     }
-    
