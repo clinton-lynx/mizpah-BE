@@ -176,15 +176,12 @@ def get_cases():
     missing = supabase.table("missing_persons").select("*").execute()
     medical = supabase.table("medical_profiles").select("*").execute()
     return {
-<<<<<<< HEAD
         "watchlist": watchlist.data,
         "missing_persons": missing.data,
         "medical_profiles": medical.data
     }
-=======
         "success": True,
         "alert": alert.data,
         "sms": sms_result
     }
     
->>>>>>> 9e575a0bcbbf0db10dc831b759ccf3c01c0044ac
