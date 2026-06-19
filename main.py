@@ -31,46 +31,76 @@ async def enroll(
     added_by: str = Form(None),
     image: UploadFile = File(...),
 ):
-    file_bytes = await image.read()
-    filename = f"{uuid.uuid4()}_{image.filename}"
+    try:
+        file_bytes = await image.read()
+        filename = f"{uuid.uuid4()}_{image.filename}"
 
-    supabase.storage.from_("face-images").upload(
-        filename, file_bytes, {"content-type": image.content_type}
-    )
+        upload_result = supabase.storage.from_("face-images").upload(
+            filename, file_bytes, {"content-type": image.content_type}
+        )
+        print("Upload result:", upload_result)
 
-    image_url = supabase.storage.from_("face-images").get_public_url(filename)
+        image_url = supabase.storage.from_("face-images").get_public_url(filename)
+        print("Image URL:", image_url)
 
-    record = {"name": name, "image_url": image_url}
+        record = {"name": name, "image_url": image_url}
 
-    if type == "watchlist":
-        record.update({
-            "threat_level": threat_level,
-            "reason": reason,
-            "added_by": added_by,
-        })
-        result = supabase.table("watchlist").insert(record).execute()
+        if type == "watchlist":
+            record.update({
+                "threat_level": threat_level,
+                "reason": reason,
+                "added_by": added_by,
+            })
+            result = supabase.table("watchlist").insert(record).execute()
+        elif type == "missing":
+            record.update({
+                "registered_by": registered_by,
+                "last_seen_location": last_seen_location,
+                "description": description,
+            })
+            result = supabase.table("missing_persons").insert(record).execute()
+        elif type == "medical":
+            record.update({
+                "blood_type": blood_type,
+                "allergies": allergies.split(",") if allergies else [],
+                "conditions": conditions.split(",") if conditions else [],
+                "emergency_contact": emergency_contact,
+            })
+            result = supabase.table("medical_profiles").insert(record).execute()
+        else:
+            return {"error": "Invalid type. Use watchlist, missing, or medical"}
 
-    elif type == "missing":
-        record.update({
-            "registered_by": registered_by,
-            "last_seen_location": last_seen_location,
-            "description": description,
-        })
-        result = supabase.table("missing_persons").insert(record).execute()
+        return {"success": True, "data": result.data}
 
-    elif type == "medical":
-        record.update({
-            "blood_type": blood_type,
-            "allergies": allergies.split(",") if allergies else [],
-            "conditions": conditions.split(",") if conditions else [],
-            "emergency_contact": emergency_contact,
-        })
-        result = supabase.table("medical_profiles").insert(record).execute()
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print("ENROLL ERROR:", error_detail)
+        return {"success": False, "error": str(e), "traceback": error_detail}
 
-    else:
-        return {"error": "Invalid type. Use watchlist, missing, or medical"}
 
-    return {"success": True, "data": result.data}
+@app.get("/profiles")
+def get_profiles():
+    try:
+        watchlist = supabase.table("watchlist").select("*").execute()
+        missing = supabase.table("missing_persons").select("*").execute()
+        medical = supabase.table("medical_profiles").select("*").execute()
+
+        profiles = []
+        for p in watchlist.data:
+            p["type"] = "watchlist"
+            profiles.append(p)
+        for p in missing.data:
+            p["type"] = "missing"
+            profiles.append(p)
+        for p in medical.data:
+            p["type"] = "medical"
+            profiles.append(p)
+
+        return {"profiles": profiles}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.post("/scan")
