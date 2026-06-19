@@ -2,7 +2,29 @@ from fastapi import FastAPI, UploadFile, File, Form
 from supabase_client import supabase
 import uuid
 import httpx
+import base64
 app = FastAPI(title="Mizpah API")
+
+
+async def enroll_face_embedding(image_bytes: bytes, enrolled_id, profile_type: str):
+    if not enrolled_id:
+        return
+
+    try:
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            ml_response = await client.post(
+                "https://mizpah-ml-production.up.railway.app/enroll",
+                json={
+                    "image": image_b64,
+                    "person_id": str(enrolled_id),
+                    "type": profile_type,
+                },
+            )
+            print("ML enroll response:", ml_response.json())
+    except Exception as ml_error:
+        print("ML enroll failed:", str(ml_error))
 
 
 @app.get("/")
@@ -52,6 +74,8 @@ async def enroll(
                 "added_by": added_by,
             })
             result = supabase.table("watchlist").insert(record).execute()
+            enrolled_id = result.data[0]["id"] if result.data else None
+            await enroll_face_embedding(file_bytes, enrolled_id, type)
         elif type == "missing":
             record.update({
                 "registered_by": registered_by,
@@ -59,6 +83,8 @@ async def enroll(
                 "description": description,
             })
             result = supabase.table("missing_persons").insert(record).execute()
+            enrolled_id = result.data[0]["id"] if result.data else None
+            await enroll_face_embedding(file_bytes, enrolled_id, type)
         elif type == "medical":
             record.update({
                 "blood_type": blood_type,
@@ -67,6 +93,8 @@ async def enroll(
                 "emergency_contact": emergency_contact,
             })
             result = supabase.table("medical_profiles").insert(record).execute()
+            enrolled_id = result.data[0]["id"] if result.data else None
+            await enroll_face_embedding(file_bytes, enrolled_id, type)
         else:
             return {"error": "Invalid type. Use watchlist, missing, or medical"}
 
