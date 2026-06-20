@@ -15,7 +15,7 @@ async def enroll_face_embedding(image_bytes: bytes, enrolled_id, profile_type: s
 
         async with httpx.AsyncClient(timeout=60) as client:
             ml_response = await client.post(
-                "https://mizpah-ml-production.up.railway.app/enroll",
+                "https://mizpah-ml.onrender.com/enroll",
                 json={
                     "image": image_b64,
                     "person_id": str(enrolled_id),
@@ -136,7 +136,7 @@ async def scan(image: str = Form(...), mode: str = Form(...)):
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
-                "https://mizpah-ml-production.up.railway.app/scan",
+                "https://mizpah-ml.onrender.com/scan",
                 json={"image": image, "mode": mode}
             )
             result = response.json()
