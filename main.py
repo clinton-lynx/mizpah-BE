@@ -296,4 +296,16 @@ def update_report(report_id: str, req: UpdateReportRequest):
     update_data = {k: v for k, v in req.dict().items() if v is not None}
     result = supabase.table("reports").update(update_data).eq("id", report_id).execute()
     return {"success": True, "data": result.data}
+
+
+@app.get("/match-events")
+def get_match_events():
+    result = (
+        supabase.table("match_events")
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    return {"match_events": result.data}
     
