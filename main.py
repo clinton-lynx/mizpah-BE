@@ -171,12 +171,32 @@ async def scan(image: str = Form(...), mode: str = Form(...)):
 
             # Log match event if matched
             if result.get("matched"):
+                matched_profile = result.get("profile") or result.get("matched_profile") or {}
+                matched_person_id = (
+                    matched_profile.get("person_id")
+                    if isinstance(matched_profile, dict)
+                    else None
+                ) or result.get("person_id")
+
+                reports = []
+                if matched_person_id:
+                    reports_result = (
+                        supabase.table("reports")
+                        .select("*")
+                        .eq("person_id", matched_person_id)
+                        .eq("status", "active")
+                        .execute()
+                    )
+                    reports = reports_result.data if reports_result.data else []
+
                 supabase.table("match_events").insert({
                     "person_id": None,
                     "confidence": result.get("confidence"),
                     "use_case_type": mode,
                     "location": "camera-feed",
                 }).execute()
+
+                result["reports"] = reports
 
             return result
     except Exception as e:
