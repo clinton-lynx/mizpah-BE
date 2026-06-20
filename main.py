@@ -1,5 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
 from supabase_client import supabase
 import uuid
 import httpx
@@ -13,6 +16,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class CreateReportRequest(BaseModel):
+    person_id: str
+    report_type: str  # "watchlist" or "missing"
+    threat_level: Optional[str] = None
+    reason: Optional[str] = None
+    last_seen_location: Optional[str] = None
+    description: Optional[str] = None
+    flagged_by: Optional[str] = None
+
+
+class UpdateReportRequest(BaseModel):
+    status: Optional[str] = None
+    threat_level: Optional[str] = None
+    reason: Optional[str] = None
 
 
 async def enroll_face_embedding(image_bytes: bytes, enrolled_id, profile_type: str):
@@ -217,4 +236,35 @@ def get_cases():
         "missing_persons": missing.data,
         "medical_profiles": medical.data
     }
+
+
+@app.post("/reports")
+def create_report(req: CreateReportRequest):
+    record = {
+        "person_id": req.person_id,
+        "report_type": req.report_type,
+        "threat_level": req.threat_level,
+        "reason": req.reason,
+        "last_seen_location": req.last_seen_location,
+        "description": req.description,
+        "flagged_by": req.flagged_by,
+    }
+    result = supabase.table("reports").insert(record).execute()
+    return {"success": True, "data": result.data}
+
+
+@app.get("/reports")
+def get_reports(person_id: Optional[str] = None):
+    query = supabase.table("reports").select("*")
+    if person_id:
+        query = query.eq("person_id", person_id)
+    result = query.execute()
+    return {"reports": result.data}
+
+
+@app.patch("/reports/{report_id}")
+def update_report(report_id: str, req: UpdateReportRequest):
+    update_data = {k: v for k, v in req.dict().items() if v is not None}
+    result = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+    return {"success": True, "data": result.data}
     
