@@ -34,6 +34,11 @@ class UpdateReportRequest(BaseModel):
     reason: Optional[str] = None
 
 
+class ScanRequest(BaseModel):
+    image: str
+    mode: str
+
+
 async def enroll_face_embedding(image_bytes: bytes, enrolled_id, profile_type: str):
     if not enrolled_id:
         return
@@ -160,7 +165,9 @@ def get_profiles():
 
 
 @app.post("/scan")
-async def scan(image: str = Form(...), mode: str = Form(...)):
+async def scan(req: ScanRequest):
+    image = req.image
+    mode = req.mode
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
