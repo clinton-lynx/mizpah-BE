@@ -1,9 +1,18 @@
 from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from supabase_client import supabase
 import uuid
 import httpx
 import base64
 app = FastAPI(title="Mizpah API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def enroll_face_embedding(image_bytes: bytes, enrolled_id, profile_type: str):
