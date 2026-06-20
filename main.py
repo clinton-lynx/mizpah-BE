@@ -168,6 +168,7 @@ async def scan(image: str = Form(...), mode: str = Form(...)):
                 json={"image": image, "mode": mode}
             )
             result = response.json()
+            print(result)
 
             # Log match event if matched
             if result.get("matched"):
@@ -178,8 +179,15 @@ async def scan(image: str = Form(...), mode: str = Form(...)):
                     else None
                 ) or result.get("person_id")
 
-                reports = []
                 if matched_person_id:
+                    profile_result = (
+                        supabase.table("medical_profiles")
+                        .select("*")
+                        .eq("id", matched_person_id)
+                        .execute()
+                    )
+                    full_profile = profile_result.data[0] if profile_result.data else result.get("profile")
+
                     reports_result = (
                         supabase.table("reports")
                         .select("*")
@@ -189,14 +197,15 @@ async def scan(image: str = Form(...), mode: str = Form(...)):
                     )
                     reports = reports_result.data if reports_result.data else []
 
+                    result["profile"] = full_profile
+                    result["reports"] = reports
+
                 supabase.table("match_events").insert({
                     "person_id": None,
                     "confidence": result.get("confidence"),
                     "use_case_type": mode,
                     "location": "camera-feed",
                 }).execute()
-
-                result["reports"] = reports
 
             return result
     except Exception as e:
